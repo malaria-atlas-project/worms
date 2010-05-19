@@ -10,24 +10,7 @@ ttol = 1./12
 
 import tables as tb
 import numpy as np
-import agecorr
 from st_cov_fun import *
-from pr_incidence import BurdenPredictor
-
-a_pred = a_pred = np.hstack((np.arange(15), np.arange(15,75,5), [100]))
-age_pr_file = tb.openFile('pr-falciparum')
-age_dist_file = tb.openFile('age-dist-falciparum')
-
-age_pr_trace = age_pr_file.root.chain0.PyMCsamples.cols
-age_dist_trace = age_dist_file.root.chain0.PyMCsamples.cols
-P_trace = age_pr_trace.P_pred[:]
-S_trace = age_dist_trace.S_pred[:]
-F_trace = age_pr_trace.F_pred[:]
-age_pr_file.close()
-age_dist_file.close()
-
-two_ten_factors = agecorr.two_ten_factors(10000, P_trace, S_trace, F_trace)
-
 from generic_mbg import FieldStepper, invlogit, histogram_reduce
 from pymc import thread_partition_array
 from pymc.gp import GPEvaluationGibbs
@@ -50,41 +33,11 @@ non_cov_columns = {'lo_age': 'int', 'up_age': 'int', 'pos': 'float', 'neg': 'flo
 
 # Postprocessing stuff for mapping
 
-def vivax(sp_sub):
-    cmin, cmax = thread_partition_array(sp_sub)
-    out = sp_sub_b.copy('F')     
-    ttf = two_ten_factors[np.random.randint(len(two_ten_factors))]
-    
-    pm.map_noreturn(vivax_postproc, [(out, sp_sub_0, sp_sub_v, p1, ttf, cmin[i], cmax[i]) for i in xrange(len(cmax))])
-    return out
-
-def pr(sp_sub, two_ten_facs=two_ten_factors):
+def pr(sp_sub):
     pr = sp_sub.copy('F')
-    pr = invlogit(pr) * two_ten_facs[np.random.randint(len(two_ten_facs))]
-    return pr
+    return invlogit(pr)
 
-N_year = 1./12
-xplot = np.linspace(0.001,1,100)
-xplot_aug = np.concatenate(([0],xplot))
-def incidence(sp_sub, 
-                two_ten_facs=two_ten_factors,
-                p2b = BurdenPredictor('CSE_Asia_and_Americas_scale_0.6_model_exp.hdf5', N_year),
-                N_year = N_year):
-    pr = sp_sub.copy('F')
-    pr = invlogit(pr) * two_ten_facs[np.random.randint(len(two_ten_facs))]
-    i = np.random.randint(len(p2b.f))
-    mu = p2b.f[i](pr)
-    
-    # Uncomment and draw a negative binomial variate to get incidence over a finite time horizon.
-    r = (p2b.r_int[i] + p2b.r_lin[i] * pr + p2b.r_quad[i] * pr**2)
-    ar = pm.rgamma(beta=r/mu, alpha=r*N_year)
-
-    out = (1-np.exp(-ar))
-    out[np.where(out==0)]=1e-10
-    out[np.where(out==1)]=1-(1e-10)
-    return out
-    
-map_postproc = [pr, incidence]
+map_postproc = [pr]
 bins = np.array([0,.1,.5,1])
 
 def binfn(arr, bins=bins):
@@ -131,7 +84,5 @@ def simdata_postproc(sp_sub, survey_plan):
 # Initialize step methods
 def mcmc_init(M):
     M.use_step_method(GPEvaluationGibbs, M.sp_sub, M.V, M.eps_p_f_list, ti=M.ti)
-
-
 
 from model import *

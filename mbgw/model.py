@@ -22,16 +22,12 @@ from generic_mbg import *
 from st_cov_fun import *
 import generic_mbg
 import warnings
-from agecorr import age_corr_likelihoods
-from mbgw import P_trace, S_trace, F_trace, a_pred
-from scipy import interpolate as interp
-import os, cPickle
 from pylab import csv2rec
 
 
 __all__ = ['make_model']
 
-continent = 'Asia'
+continent = 'Africa'
 with_stukel = False
 chunk = 2
 
@@ -202,17 +198,6 @@ def make_model(lon,lat,t,input_data,covariate_keys,pos,neg,lo_age=None,up_age=No
     eps_p_f_list = []
     N_pos_list = []
     
-    # Obtain the spline representation of the log of the Monte Carlo-integrated 
-    # likelihood function at each datapoint. The nodes are at .01,.02,...,.98,.99 .
-    splrep_fname = hashlib.sha1(lo_age.tostring()+up_age.tostring()+pos.tostring()+neg.tostring()).hexdigest()+'.pickle'
-    if splrep_fname in os.listdir('.'):
-        splreps = cPickle.loads(file(splrep_fname).read())
-    else:
-        junk, splreps = age_corr_likelihoods(lo_age, up_age, pos, neg, 10000, np.arange(.01,1.,.01), a_pred, P_trace, S_trace, F_trace)
-        file(splrep_fname,'w').write(cPickle.dumps(splreps))
-    for i in xrange(len(splreps)):
-        splreps[i] = list(splreps[i])
-
     # Don't worry, these are just reasonable initial values...
     if with_stukel:
         val_now = pm.stukel_logit((pos+1.)/(pos+neg+2.), a1.value, a2.value)
@@ -240,12 +225,8 @@ def make_model(lon,lat,t,input_data,covariate_keys,pos,neg,lo_age=None,up_age=No
         try:
             @pm.data
             @pm.stochastic(dtype=np.int)
-            def N_pos_now(value = pm.utils.round_array(pos[this_slice]), splrep = splreps[this_slice], eps_p_f = eps_p_f_now, a1=a1, a2=a2):
-                p_now = pm.flib.stukel_invlogit(eps_p_f, a1, a2)
-                out = 0.
-                for i in xrange(len(value)):
-                    out += interp.splev(p_now[i], splrep[i])
-                return out
+            def N_pos_now(value = pm.utils.round_array(pos[this_slice]), n=pm.utils.round_array(pos[this_slice]+neg[this_slice]), eps_p_f = eps_p_f_now, a1=a1, a2=a2):
+                return pm.binomial_like(value, n=n, p=pm.flib.stukel_invlogit(eps_p_f, a1, a2)
         except ValueError:
             raise ValueError, 'Log-likelihood is nan at chunk %i'%i
 
