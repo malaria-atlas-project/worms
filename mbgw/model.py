@@ -226,7 +226,7 @@ def make_model(lon,lat,t,input_data,covariate_keys,pos,neg,lo_age=None,up_age=No
             @pm.data
             @pm.stochastic(dtype=np.int)
             def N_pos_now(value = pm.utils.round_array(pos[this_slice]), n=pm.utils.round_array(pos[this_slice]+neg[this_slice]), eps_p_f = eps_p_f_now, a1=a1, a2=a2):
-                return pm.binomial_like(value, n=n, p=pm.flib.stukel_invlogit(eps_p_f, a1, a2)
+                return pm.binomial_like(value, n=n, p=pm.flib.stukel_invlogit(eps_p_f, a1, a2))
         except ValueError:
             raise ValueError, 'Log-likelihood is nan at chunk %i'%i
 
