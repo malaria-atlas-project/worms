@@ -38,7 +38,7 @@ def pr(sp_sub):
     return invlogit(pr)
 
 map_postproc = [pr]
-bins = np.array([0,.1,.5,1])
+bins = np.array([0,.2])
 
 def binfn(arr, bins=bins):
     out = np.digitize(arr, bins)
