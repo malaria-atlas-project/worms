@@ -33,7 +33,7 @@ chunk = 2
 
 # Prior parameters specified by Simon, Pete and Andy
 Af_scale_params = {'mu': -2.54, 'tau': 1.42, 'alpha': -.015}
-Af_amp_params = {'mu': .0535, 'tau': 1.79, 'alpha': 3.21}
+Af_amp_params = {'mu': 1., 'tau': 1.79, 'alpha': 3.21}
 
 Am_scale_params = {'mu': -2.58, 'tau': 1.27, 'alpha': .051}
 Am_amp_params = {'mu': .607, 'tau': .809, 'alpha': -1.17}
@@ -124,7 +124,9 @@ def make_model(lon,lat,t,input_data,covariate_keys,pos,neg,lo_age=None,up_age=No
             return pm.gp.Mean(pm.gp.zero_fn)
     
         # Inverse-gamma prior on nugget variance V.
-        V = pm.Exponential('V', .1, value=1.)
+        tau = pm.Gamma('tau', alpha=3, beta=3/.25, value=5)
+        V = pm.Lambda('V', lambda tau=tau:1./tau)
+        #V = pm.Exponential('V', .1, value=1.)
     
         vars_to_writeout = ['V', 'm_const', 't_coef']
         
@@ -141,7 +143,7 @@ def make_model(lon,lat,t,input_data,covariate_keys,pos,neg,lo_age=None,up_age=No
 
         # Use a uniform prior on sqrt ecc (sqrt ???). Using a uniform prior on ecc itself put too little
         # probability mass on appreciable levels of anisotropy.
-        sqrt_ecc = pm.Uniform('sqrt_ecc', value=.1, lower=0., upper=1.)
+        sqrt_ecc = pm.Uniform('sqrt_ecc', value=.4, lower=0., upper=1.)
         ecc = pm.Lambda('ecc', lambda s=sqrt_ecc: s**2)
 
         # Subjective skew-normal prior on amp (the partial sill, tau) in log-space.
@@ -155,13 +157,13 @@ def make_model(lon,lat,t,input_data,covariate_keys,pos,neg,lo_age=None,up_age=No
 
         # Exponential prior on the temporal scale/range, phi_t. Standard one-over-x
         # doesn't work bc data aren't strong enough to prevent collapse to zero.
-        scale_t = pm.Exponential('scale_t', .1,value=.1)
+        scale_t = pm.Exponential('scale_t', .1,value=1.5)
 
         # Uniform prior on limiting correlation far in the future or past.
-        t_lim_corr = pm.Uniform('t_lim_corr',0,1,value=.01)
+        t_lim_corr = pm.Uniform('t_lim_corr',0,1,value=.5)
 
         # # Uniform prior on sinusoidal fraction in temporal variogram
-        sin_frac = pm.Uniform('sin_frac',0,1,value=.01)
+        sin_frac = pm.Uniform('sin_frac',0,1,value=.3)
         
         vars_to_writeout.extend(['inc','ecc','amp','scale','scale_t','t_lim_corr','sin_frac'])
     
